@@ -3,7 +3,12 @@ package cacheaside
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/erkesi/cacheaside/cache"
+	"golang.org/x/sync/singleflight"
 )
 
 type FetchSource func(ctx context.Context, keys []string,
@@ -19,6 +24,7 @@ type CacheAside struct {
 	ttl         *cache.TTL
 	fetchSource FetchSource
 	genCacheKey GenCacheKey
+	sfg         singleflight.Group
 }
 
 func NewCacheAside(code Coder, cache cache.Cacher) *CacheAside {
@@ -62,23 +68,26 @@ func (caf *CacheAsideFetcher) MGet(ctx context.Context, keys []string, extra ...
 	if err := caf.checkCache(); err != nil {
 		return nil, err
 	}
+	sort.Strings(keys)
+	val, err, _ := caf.ca.sfg.Do(strings.Join(keys, ","), func() (v interface{}, e error) {
+		m, err := caf.ca.cache.MGet(ctx, caf.ca.ttl, keys...)
+		if err != nil {
+			return nil, err
+		}
 
-	m, err := caf.ca.cache.MGet(ctx, caf.ca.ttl, keys...)
-	if err != nil {
-		return nil, err
-	}
+		kvs, missM, err := caf.fetchSourceMiss(ctx, keys, m, extra...)
+		if err != nil {
+			return nil, err
+		}
 
-	kvs, missM, err := caf.fetchSourceMiss(ctx, keys, m, extra...)
-	if err != nil {
-		return nil, err
-	}
+		err = caf.ca.cache.MSet(ctx, caf.ca.ttl, kvs...)
+		if err != nil {
+			return nil, err
+		}
 
-	err = caf.ca.cache.MSet(ctx, caf.ca.ttl, kvs...)
-	if err != nil {
-		return nil, err
-	}
-
-	return caf.merge(keys, m, missM), nil
+		return caf.merge(keys, m, missM), nil
+	})
+	return val.([]interface{}), err
 }
 
 func (caf *CacheAsideFetcher) MDel(ctx context.Context, keys ...string) error {
@@ -102,23 +111,26 @@ func (caf *CacheAsideFetcher) HMGet(ctx context.Context, key string, subKeys []s
 	if err := caf.checkHCache(); err != nil {
 		return nil, err
 	}
+	sort.Strings(subKeys)
+	val, err, _ := caf.ca.sfg.Do(fmt.Sprintf("%s[%s]", key, strings.Join(subKeys, ",")),
+		func() (v interface{}, e error) {
+			m, err := caf.ca.hcache.HMGet(ctx, key, caf.ca.ttl, subKeys...)
+			if err != nil {
+				return nil, err
+			}
 
-	m, err := caf.ca.hcache.HMGet(ctx, key, caf.ca.ttl, subKeys...)
-	if err != nil {
-		return nil, err
-	}
+			kvs, missM, err := caf.fetchSourceMiss(ctx, subKeys, m, extra...)
+			if err != nil {
+				return nil, err
+			}
 
-	kvs, missM, err := caf.fetchSourceMiss(ctx, subKeys, m, extra...)
-	if err != nil {
-		return nil, err
-	}
-
-	err = caf.ca.hcache.HMSet(ctx, key, caf.ca.ttl, kvs...)
-	if err != nil {
-		return nil, err
-	}
-
-	return caf.merge(subKeys, m, missM), nil
+			err = caf.ca.hcache.HMSet(ctx, key, caf.ca.ttl, kvs...)
+			if err != nil {
+				return nil, err
+			}
+			return caf.merge(subKeys, m, missM), nil
+		})
+	return val.([]interface{}), err
 }
 
 func (caf *CacheAsideFetcher) HMDel(ctx context.Context, key string, subKeys ...string) error {
@@ -159,9 +171,9 @@ func (caf *CacheAsideFetcher) fetchSourceMiss(ctx context.Context, keys []string
 		missM[key] = v
 	}
 
-	var kvs []*KV
+	var kvs []*cache.KV
 	for _, key := range missKeys {
-		kvs = append(kvs, &KV{
+		kvs = append(kvs, &cache.KV{
 			Key: key,
 			Val: missM[key],
 		})
