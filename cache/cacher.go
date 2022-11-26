@@ -6,8 +6,9 @@ import (
 )
 
 type KV struct {
-	Key string
-	Val []byte
+	Key  string
+	Val  interface{}
+	Data []byte
 }
 
 // HCacher hash
