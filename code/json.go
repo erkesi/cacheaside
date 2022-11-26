@@ -1,4 +1,4 @@
-package coder
+package code
 
 import (
 	"encoding/json"

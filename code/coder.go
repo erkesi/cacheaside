@@ -1,4 +1,4 @@
-package cacheaside
+package code
 
 type Coder interface {
 	Encode(interface{}) ([]byte, error)

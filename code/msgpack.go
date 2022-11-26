@@ -1,4 +1,4 @@
-package coder
+package code
 
 import (
 	msgpack "github.com/vmihailenco/msgpack/v5"

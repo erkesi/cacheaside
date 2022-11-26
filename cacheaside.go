@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/erkesi/cacheaside/cache"
+	"github.com/erkesi/cacheaside/code"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -19,7 +20,7 @@ type GenCacheKey func(ctx context.Context, v interface{},
 	extra ...interface{}) (string, error)
 
 type CacheAside struct {
-	code        Coder
+	code        code.Coder
 	cache       cache.Cacher
 	hcache      cache.HCacher
 	ttl         time.Duration
@@ -28,14 +29,14 @@ type CacheAside struct {
 	sfg         singleflight.Group
 }
 
-func NewCacheAside(code Coder, cache cache.Cacher) *CacheAside {
+func NewCacheAside(code code.Coder, cache cache.Cacher) *CacheAside {
 	return &CacheAside{
 		code:  code,
 		cache: cache,
 	}
 }
 
-func NewHCacheAside(code Coder, hcache cache.HCacher) *CacheAside {
+func NewHCacheAside(code code.Coder, hcache cache.HCacher) *CacheAside {
 	return &CacheAside{
 		code:   code,
 		hcache: hcache,
