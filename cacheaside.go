@@ -58,7 +58,8 @@ type CacheAsideFetcher struct {
 	ca *CacheAside
 }
 
-func (caf *CacheAsideFetcher) Get(ctx context.Context, key string, extra ...interface{}) (interface{}, error) {
+func (caf *CacheAsideFetcher) Get(ctx context.Context, key string,
+	 extra ...interface{}) (interface{}, error) {
 	m, err := caf.MGet(ctx, []string{key}, extra...)
 	if err != nil {
 		return nil, err
@@ -66,7 +67,8 @@ func (caf *CacheAsideFetcher) Get(ctx context.Context, key string, extra ...inte
 	return m[0], nil
 }
 
-func (caf *CacheAsideFetcher) MGet(ctx context.Context, keys []string, extra ...interface{}) ([]interface{}, error) {
+func (caf *CacheAsideFetcher) MGet(ctx context.Context, keys []string, 
+	extra ...interface{}) ([]interface{}, error) {
 	if err := caf.checkCache(); err != nil {
 		return nil, err
 	}
