@@ -59,7 +59,7 @@ type CacheAsideFetcher struct {
 }
 
 func (caf *CacheAsideFetcher) Get(ctx context.Context, key string,
-	 extra ...interface{}) (interface{}, error) {
+	extra ...interface{}) (interface{}, error) {
 	m, err := caf.MGet(ctx, []string{key}, extra...)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (caf *CacheAsideFetcher) Get(ctx context.Context, key string,
 	return m[0], nil
 }
 
-func (caf *CacheAsideFetcher) MGet(ctx context.Context, keys []string, 
+func (caf *CacheAsideFetcher) MGet(ctx context.Context, keys []string,
 	extra ...interface{}) ([]interface{}, error) {
 	if err := caf.checkCache(); err != nil {
 		return nil, err
@@ -79,12 +79,12 @@ func (caf *CacheAsideFetcher) MGet(ctx context.Context, keys []string,
 			return nil, err
 		}
 
-		kvs, missM, err := caf.fetchSourceMiss(ctx, keys, m, extra...)
+		missKVs, missM, err := caf.fetchSourceMiss(ctx, keys, m, extra...)
 		if err != nil {
 			return nil, err
 		}
 
-		err = caf.ca.cache.MSet(ctx, caf.ca.ttl, kvs...)
+		err = caf.ca.cache.MSet(ctx, caf.ca.ttl, missKVs...)
 		if err != nil {
 			return nil, err
 		}
@@ -123,12 +123,12 @@ func (caf *CacheAsideFetcher) HMGet(ctx context.Context, key string, subKeys []s
 				return nil, err
 			}
 
-			kvs, missM, err := caf.fetchSourceMiss(ctx, subKeys, m, extra...)
+			missKVs, missM, err := caf.fetchSourceMiss(ctx, subKeys, m, extra...)
 			if err != nil {
 				return nil, err
 			}
 
-			err = caf.ca.hcache.HMSet(ctx, key, caf.ca.ttl, kvs...)
+			err = caf.ca.hcache.HMSet(ctx, key, caf.ca.ttl, missKVs...)
 			if err != nil {
 				return nil, err
 			}
@@ -175,14 +175,20 @@ func (caf *CacheAsideFetcher) fetchSourceMiss(ctx context.Context, keys []string
 		missM[key] = v
 	}
 
-	var kvs []*cache.KV
+	var missKVs []*cache.KV
 	for _, key := range missKeys {
-		kvs = append(kvs, &cache.KV{
-			Key: key,
-			Val: missM[key],
+		val := missM[key]
+		data, err := caf.ca.code.Encode(val)
+		if err != nil {
+			return nil, nil, err
+		}
+		missKVs = append(missKVs, &cache.KV{
+			Key:  key,
+			Val:  missM[key],
+			Data: data,
 		})
 	}
-	return kvs, missM, nil
+	return missKVs, missM, nil
 }
 
 func (caf *CacheAsideFetcher) merge(keys []string, m, missM map[string]interface{}) []interface{} {
