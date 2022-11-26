@@ -15,6 +15,7 @@ type TTL struct {
 	Real  time.Duration
 }
 
+// HCacher hash
 type HCacher interface {
 	HMSet(ctx context.Context, key string, ttl *TTL, kvs ...*KV) error
 	HMGet(ctx context.Context, key string, ttl *TTL, subKeys ...string) (map[string]interface{}, error)
@@ -22,6 +23,7 @@ type HCacher interface {
 	HMDel(ctx context.Context, key string, subKeys ...string) error
 }
 
+// Cacher string
 type Cacher interface {
 	MSet(ctx context.Context, ttl *TTL, kvs ...*KV) error
 	MGet(ctx context.Context, ttl *TTL, keys ...string) (map[string]interface{}, error)
