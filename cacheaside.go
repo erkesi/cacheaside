@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -58,40 +59,38 @@ type CacheAsideFetcher struct {
 	ca *CacheAside
 }
 
-func (caf *CacheAsideFetcher) Get(ctx context.Context, key string,
-	extra ...interface{}) (interface{}, error) {
-	m, err := caf.MGet(ctx, []string{key}, extra...)
-	if err != nil {
-		return nil, err
-	}
-	return m[0], nil
+func (caf *CacheAsideFetcher) Get(ctx context.Context, key string, res interface{},
+	extra ...interface{}) error {
+	return caf.MGet(ctx, []string{key}, res, extra...)
 }
 
-func (caf *CacheAsideFetcher) MGet(ctx context.Context, keys []string,
-	extra ...interface{}) ([]interface{}, error) {
+func (caf *CacheAsideFetcher) MGet(ctx context.Context, keys []string, res interface{},
+	extra ...interface{}) error {
 	if err := caf.checkCache(); err != nil {
-		return nil, err
+		return err
 	}
-	sort.Strings(keys)
-	val, err, _ := caf.ca.sfg.Do(strings.Join(keys, ","), func() (v interface{}, e error) {
-		m, err := caf.ca.cache.MGet(ctx, caf.ca.ttl, keys...)
-		if err != nil {
-			return nil, err
-		}
 
-		missKVs, missM, err := caf.fetchSourceMiss(ctx, keys, m, extra...)
-		if err != nil {
-			return nil, err
-		}
+	tmpResType, tmpResVal, err := caf.resRelVal(len(keys), res)
+	if err != nil {
+		return err
+	}
 
-		err = caf.ca.cache.MSet(ctx, caf.ca.ttl, missKVs...)
-		if err != nil {
-			return nil, err
-		}
+	m, err := caf.ca.cache.MGet(ctx, caf.ca.ttl, keys...)
+	if err != nil {
+		return err
+	}
 
-		return caf.merge(keys, m, missM), nil
-	})
-	return val.([]interface{}), err
+	missKVs, missM, err := caf.fetchSourceMiss(ctx, keys, m, extra...)
+	if err != nil {
+		return err
+	}
+
+	err = caf.ca.cache.MSet(ctx, caf.ca.ttl, missKVs...)
+	if err != nil {
+		return err
+	}
+
+	return caf.merge(keys, m, missM, tmpResType, tmpResVal)
 }
 
 func (caf *CacheAsideFetcher) MDel(ctx context.Context, keys ...string) error {
@@ -101,47 +100,43 @@ func (caf *CacheAsideFetcher) MDel(ctx context.Context, keys ...string) error {
 	return caf.ca.cache.MDel(ctx, keys...)
 }
 
-func (caf *CacheAsideFetcher) HGet(ctx context.Context, key, subKey string,
-	extra ...interface{}) (interface{}, error) {
-	vals, err := caf.HMGet(ctx, key, []string{subKey}, extra...)
-	if err != nil {
-		return nil, err
-	}
-	return vals[0], nil
+func (caf *CacheAsideFetcher) HGet(ctx context.Context, key, field string, res interface{},
+	extra ...interface{}) error {
+	return caf.HMGet(ctx, key, []string{field}, res, extra...)
 }
 
-func (caf *CacheAsideFetcher) HMGet(ctx context.Context, key string, subKeys []string,
-	extra ...interface{}) ([]interface{}, error) {
-	if err := caf.checkHCache(); err != nil {
-		return nil, err
-	}
-	sort.Strings(subKeys)
-	val, err, _ := caf.ca.sfg.Do(fmt.Sprintf("%s[%s]", key, strings.Join(subKeys, ",")),
-		func() (v interface{}, e error) {
-			m, err := caf.ca.hcache.HMGet(ctx, key, caf.ca.ttl, subKeys...)
-			if err != nil {
-				return nil, err
-			}
-
-			missKVs, missM, err := caf.fetchSourceMiss(ctx, subKeys, m, extra...)
-			if err != nil {
-				return nil, err
-			}
-
-			err = caf.ca.hcache.HMSet(ctx, key, caf.ca.ttl, missKVs...)
-			if err != nil {
-				return nil, err
-			}
-			return caf.merge(subKeys, m, missM), nil
-		})
-	return val.([]interface{}), err
-}
-
-func (caf *CacheAsideFetcher) HMDel(ctx context.Context, key string, subKeys ...string) error {
+func (caf *CacheAsideFetcher) HMGet(ctx context.Context, key string, fields []string, res interface{},
+	extra ...interface{}) error {
 	if err := caf.checkHCache(); err != nil {
 		return err
 	}
-	return caf.ca.hcache.HMDel(ctx, key, subKeys...)
+	tmpResType, tmpResVal, err := caf.resRelVal(len(fields), res)
+	if err != nil {
+		return err
+	}
+
+	m, err := caf.ca.hcache.HMGet(ctx, key, caf.ca.ttl, fields...)
+	if err != nil {
+		return err
+	}
+
+	missKVs, missM, err := caf.fetchSourceMiss(ctx, fields, m, extra...)
+	if err != nil {
+		return err
+	}
+
+	err = caf.ca.hcache.HMSet(ctx, key, caf.ca.ttl, missKVs...)
+	if err != nil {
+		return err
+	}
+	return caf.merge(fields, m, missM, tmpResType, tmpResVal)
+}
+
+func (caf *CacheAsideFetcher) HMDel(ctx context.Context, key string, fields ...string) error {
+	if err := caf.checkHCache(); err != nil {
+		return err
+	}
+	return caf.ca.hcache.HMDel(ctx, key, fields...)
 }
 
 func (caf *CacheAsideFetcher) HDel(ctx context.Context, key string) error {
@@ -152,7 +147,7 @@ func (caf *CacheAsideFetcher) HDel(ctx context.Context, key string) error {
 }
 
 func (caf *CacheAsideFetcher) fetchSourceMiss(ctx context.Context, keys []string,
-	m map[string]interface{}, extra ...interface{}) ([]*cache.KV, map[string]interface{}, error) {
+	m map[string][]byte, extra ...interface{}) ([]*cache.KV, map[string]interface{}, error) {
 	var missKeys []string
 	for _, key := range keys {
 		if _, ok := m[key]; ok {
@@ -160,14 +155,16 @@ func (caf *CacheAsideFetcher) fetchSourceMiss(ctx context.Context, keys []string
 		}
 		missKeys = append(missKeys, key)
 	}
-
-	vals, err := caf.ca.fetchSource(ctx, missKeys, extra...)
+	sort.Strings(missKeys)
+	vals, err, _ := caf.ca.sfg.Do(fmt.Sprintf("[%s]", strings.Join(missKeys, ",")),
+		func() (v interface{}, e error) {
+			return caf.ca.fetchSource(ctx, missKeys, extra...)
+		})
 	if err != nil {
 		return nil, nil, err
 	}
-
 	missM := make(map[string]interface{})
-	for _, v := range vals {
+	for _, v := range vals.([]interface{}) {
 		key, err := caf.ca.genCacheKey(ctx, v, extra...)
 		if err != nil {
 			return nil, nil, err
@@ -191,18 +188,41 @@ func (caf *CacheAsideFetcher) fetchSourceMiss(ctx context.Context, keys []string
 	return missKVs, missM, nil
 }
 
-func (caf *CacheAsideFetcher) merge(keys []string, m, missM map[string]interface{}) []interface{} {
-	var res []interface{}
-	for _, key := range keys {
-		var v interface{}
-		if vt, ok := m[key]; ok {
-			v = vt
-		} else if vt, ok := missM[key]; ok {
-			v = vt
+func (caf *CacheAsideFetcher) merge(keys []string, m map[string][]byte, missM map[string]interface{},
+	rt reflect.Type, res reflect.Value) error {
+	key2RefVal := make(map[string]reflect.Value)
+	for k, data := range m {
+		if len(data) == 0 {
+			key2RefVal[k] = reflect.Zero(rt)
+			continue
 		}
-		res = append(res, v)
+		v := reflect.New(caf.indirectType(rt))
+		err := caf.ca.code.Decode(data, v)
+		if err != nil {
+			return err
+		}
+		key2RefVal[k] = v
 	}
-	return res
+	for i, key := range keys {
+		var rv reflect.Value
+		b := false
+		if vt, ok := key2RefVal[key]; ok {
+			rv = vt
+			b = true
+		} else if vt, ok := missM[key]; ok {
+			rv = reflect.ValueOf(vt)
+			b = true
+		}
+		if !b {
+			continue
+		}
+		if res.Kind() == reflect.Slice {
+			res.Index(i).Set(rv)
+		} else {
+			res.Set(rv)
+		}
+	}
+	return nil
 }
 
 func (caf *CacheAsideFetcher) checkCache() error {
@@ -230,4 +250,28 @@ func (caf *CacheAsideFetcher) check() error {
 		return errors.New("cacheaside: genCacheKey is nil")
 	}
 	return nil
+}
+
+func (caf *CacheAsideFetcher) indirectType(rt reflect.Type) reflect.Type {
+	for rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+	}
+	return rt
+}
+func (caf *CacheAsideFetcher) resRelVal(size int, res interface{}) (reflect.Type, reflect.Value, error) {
+	rv := reflect.ValueOf(res)
+	if rv.Kind() != reflect.Ptr {
+		return rv.Type(), rv, errors.New("cacheaside: res must be valid pointer")
+	}
+	tmpResVal := rv
+	tmpResType := rv.Type()
+	if rv.Elem().Kind() == reflect.Slice {
+		tmpResVal = rv.Elem()
+		tmpResType = rv.Type().Elem()
+		if tmpResVal.Len() < size {
+			newSlice := reflect.MakeSlice(reflect.SliceOf(tmpResType), size, size)
+			tmpResVal.Set(newSlice)
+		}
+	}
+	return tmpResType, tmpResVal, nil
 }

@@ -6,8 +6,12 @@ github.com/erkesi/cacheaside/cache v0.0.0-20221126193808-7d69c0a1e1e0 h1:XMbmdVo
 github.com/erkesi/cacheaside/cache v0.0.0-20221126193808-7d69c0a1e1e0/go.mod h1:Mw5Ho5TR16DAPEjqCxd2n1fYrCAzqqNm+EVIzyh8cII=
 github.com/erkesi/cacheaside/cache v0.0.0-20221126195309-cf6ec317db49 h1:2x2LMcDNTZYAsDRuy5q2jYrKNn5XFyyEN+c6ocg4bW8=
 github.com/erkesi/cacheaside/cache v0.0.0-20221126195309-cf6ec317db49/go.mod h1:Mw5Ho5TR16DAPEjqCxd2n1fYrCAzqqNm+EVIzyh8cII=
+github.com/erkesi/cacheaside/cache v0.0.0-20221126202955-558a419853fd h1:Hsp/mLJDPTuzuFdz6OSc7O7KleJMnucSnn2e5nOp9p0=
+github.com/erkesi/cacheaside/cache v0.0.0-20221126202955-558a419853fd/go.mod h1:Mw5Ho5TR16DAPEjqCxd2n1fYrCAzqqNm+EVIzyh8cII=
 github.com/erkesi/cacheaside/code v0.0.0-20221126195309-cf6ec317db49 h1:T8gABllhd5kolHSrYk7aKOLG8quhD/vQfEKXUQ3Pfig=
 github.com/erkesi/cacheaside/code v0.0.0-20221126195309-cf6ec317db49/go.mod h1:tRKaeJBp0ZIdpFyCBXRRXD/bH4H8I+Yd2AiqHbKxkeM=
+github.com/erkesi/cacheaside/code v0.0.0-20221126202955-558a419853fd h1:fPcF288x4dra54tMkSlbtd2P7R8fiKvZnOQJ+5xWDyc=
+github.com/erkesi/cacheaside/code v0.0.0-20221126202955-558a419853fd/go.mod h1:tRKaeJBp0ZIdpFyCBXRRXD/bH4H8I+Yd2AiqHbKxkeM=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

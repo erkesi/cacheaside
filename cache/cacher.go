@@ -14,9 +14,9 @@ type KV struct {
 // HCacher hash
 type HCacher interface {
 	HMSet(ctx context.Context, key string, ttl time.Duration, kvs ...*KV) error
-	HMGet(ctx context.Context, key string, ttl time.Duration, subKeys ...string) (map[string][]byte, error)
+	HMGet(ctx context.Context, key string, ttl time.Duration, fields ...string) (map[string][]byte, error)
 	HDel(ctx context.Context, key string) error
-	HMDel(ctx context.Context, key string, subKeys ...string) error
+	HMDel(ctx context.Context, key string, fields ...string) error
 }
 
 // Cacher string
