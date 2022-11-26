@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/erkesi/cacheaside/cache"
 	"golang.org/x/sync/singleflight"
@@ -21,7 +22,7 @@ type CacheAside struct {
 	code        Coder
 	cache       cache.Cacher
 	hcache      cache.HCacher
-	ttl         *cache.TTL
+	ttl         time.Duration
 	fetchSource FetchSource
 	genCacheKey GenCacheKey
 	sfg         singleflight.Group
@@ -42,7 +43,7 @@ func NewHCacheAside(code Coder, hcache cache.HCacher) *CacheAside {
 }
 
 func (ca *CacheAside) Fetch(genCacheKey GenCacheKey,
-	fetchSource FetchSource, ttl *cache.TTL) *CacheAsideFetcher {
+	fetchSource FetchSource, ttl time.Duration) *CacheAsideFetcher {
 	return &CacheAsideFetcher{
 		ca: &CacheAside{
 			code:  ca.code,
