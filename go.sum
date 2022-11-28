@@ -12,6 +12,8 @@ github.com/erkesi/cacheaside/code v0.0.0-20221126195309-cf6ec317db49 h1:T8gABllh
 github.com/erkesi/cacheaside/code v0.0.0-20221126195309-cf6ec317db49/go.mod h1:tRKaeJBp0ZIdpFyCBXRRXD/bH4H8I+Yd2AiqHbKxkeM=
 github.com/erkesi/cacheaside/code v0.0.0-20221126202955-558a419853fd h1:fPcF288x4dra54tMkSlbtd2P7R8fiKvZnOQJ+5xWDyc=
 github.com/erkesi/cacheaside/code v0.0.0-20221126202955-558a419853fd/go.mod h1:tRKaeJBp0ZIdpFyCBXRRXD/bH4H8I+Yd2AiqHbKxkeM=
+github.com/erkesi/cacheaside/code v0.0.0-20221126224304-66182fcf9f33 h1:tHNifSw4DA8ny2VPm1cNqgZrzb0h479nshvC6/7zOac=
+github.com/erkesi/cacheaside/code v0.0.0-20221126224304-66182fcf9f33/go.mod h1:tRKaeJBp0ZIdpFyCBXRRXD/bH4H8I+Yd2AiqHbKxkeM=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

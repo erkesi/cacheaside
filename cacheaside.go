@@ -75,7 +75,7 @@ func (caf *CacheAsideFetcher) MGet(ctx context.Context, keys []string, res inter
 		return err
 	}
 
-	m, err := caf.ca.cache.MGet(ctx, caf.ca.ttl, keys...)
+	m, err := caf.ca.cache.MGet(ctx, keys...)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (caf *CacheAsideFetcher) HMGet(ctx context.Context, key string, fields []st
 		return err
 	}
 
-	m, err := caf.ca.hcache.HMGet(ctx, key, caf.ca.ttl, fields...)
+	m, err := caf.ca.hcache.HMGet(ctx, key, fields...)
 	if err != nil {
 		return err
 	}

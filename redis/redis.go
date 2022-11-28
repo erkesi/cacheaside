@@ -6,14 +6,13 @@ import (
 
 	"github.com/erkesi/cacheaside/cache"
 	"github.com/go-redis/redis"
-	redisv6 "github.com/go-redis/redis"
 )
 
 type RedisWrap struct {
-	cli *redisv6.Client
+	cli *redis.Client
 }
 
-func NewRedisWrap(cli *redisv6.Client) *RedisWrap {
+func NewRedisWrap(cli *redis.Client) *RedisWrap {
 	return &RedisWrap{
 		cli: cli,
 	}
@@ -43,7 +42,7 @@ func (r *RedisWrap) MSet(ctx context.Context, ttl time.Duration, kvs ...*cache.K
 	return nil
 }
 
-func (r *RedisWrap) MGet(ctx context.Context, ttl time.Duration, keys ...string) (map[string][]byte, error) {
+func (r *RedisWrap) MGet(ctx context.Context, keys ...string) (map[string][]byte, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
@@ -110,7 +109,7 @@ func (r *RedisWrap) HMSet(ctx context.Context, key string, ttl time.Duration, kv
 	return nil
 }
 
-func (r *RedisWrap) HMGet(ctx context.Context, key string, ttl time.Duration, fields ...string) (map[string][]byte, error) {
+func (r *RedisWrap) HMGet(ctx context.Context, key string, fields ...string) (map[string][]byte, error) {
 	if len(fields) == 0 {
 		return nil, nil
 	}
