@@ -8,6 +8,8 @@ github.com/erkesi/cacheaside/cache v0.0.0-20221126195309-cf6ec317db49 h1:2x2LMcD
 github.com/erkesi/cacheaside/cache v0.0.0-20221126195309-cf6ec317db49/go.mod h1:Mw5Ho5TR16DAPEjqCxd2n1fYrCAzqqNm+EVIzyh8cII=
 github.com/erkesi/cacheaside/cache v0.0.0-20221126202955-558a419853fd h1:Hsp/mLJDPTuzuFdz6OSc7O7KleJMnucSnn2e5nOp9p0=
 github.com/erkesi/cacheaside/cache v0.0.0-20221126202955-558a419853fd/go.mod h1:Mw5Ho5TR16DAPEjqCxd2n1fYrCAzqqNm+EVIzyh8cII=
+github.com/erkesi/cacheaside/cache v0.0.0-20221126224304-66182fcf9f33 h1:79ZM3YFRmxtLAtzBaOxU5AeO3IFfotdZCXY2L25enH8=
+github.com/erkesi/cacheaside/cache v0.0.0-20221126224304-66182fcf9f33/go.mod h1:Mw5Ho5TR16DAPEjqCxd2n1fYrCAzqqNm+EVIzyh8cII=
 github.com/erkesi/cacheaside/code v0.0.0-20221126195309-cf6ec317db49 h1:T8gABllhd5kolHSrYk7aKOLG8quhD/vQfEKXUQ3Pfig=
 github.com/erkesi/cacheaside/code v0.0.0-20221126195309-cf6ec317db49/go.mod h1:tRKaeJBp0ZIdpFyCBXRRXD/bH4H8I+Yd2AiqHbKxkeM=
 github.com/erkesi/cacheaside/code v0.0.0-20221126202955-558a419853fd h1:fPcF288x4dra54tMkSlbtd2P7R8fiKvZnOQJ+5xWDyc=
