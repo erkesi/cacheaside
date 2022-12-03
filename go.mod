@@ -3,8 +3,8 @@ module github.com/erkesi/cacheaside
 go 1.16
 
 require (
-	github.com/erkesi/cacheaside/cache v0.0.0-20221126224304-66182fcf9f33 // indirect
-	github.com/erkesi/cacheaside/code v0.0.0-20221126224304-66182fcf9f33 // indirect
-	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
+	github.com/erkesi/cacheaside/cache v0.0.0-20221203150505-c72b5587cde2
+	github.com/erkesi/cacheaside/code v0.0.0-20221203150505-c72b5587cde2
+	github.com/golang/mock v1.6.0 // indirect
 	golang.org/x/sync v0.1.0
 )
