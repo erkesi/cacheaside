@@ -256,17 +256,17 @@ func (hf *HFetcher) fetchSourceMiss(ctx context.Context, key string, fields []st
 	}
 	missM := make(map[string]interface{})
 	for _, v := range vals.([]interface{}) {
-		key, err := hf.genCacheHashField(ctx, v, extra...)
+		field, err := hf.genCacheHashField(ctx, v, extra...)
 		if err != nil {
 			return nil, nil, err
 		}
-		missM[key] = v
+		missM[field] = v
 	}
 
 	var missKVs []*cache.KV
-	for _, key := range missFields {
+	for _, field := range missFields {
 		var data []byte
-		val := missM[key]
+		val := missM[field]
 		if val != nil {
 			data, err = hf.ca.code.Encode(val)
 			if err != nil {
@@ -274,8 +274,8 @@ func (hf *HFetcher) fetchSourceMiss(ctx context.Context, key string, fields []st
 			}
 		}
 		missKVs = append(missKVs, &cache.KV{
-			Key:  key,
-			Val:  missM[key],
+			Key:  field,
+			Val:  missM[field],
 			Data: data,
 		})
 	}
