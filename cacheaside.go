@@ -114,12 +114,12 @@ func (f *Fetcher) mget(ctx context.Context, keys []string, res interface{},
 		return false, err
 	}
 
-	m, err := f.ca.cache.MGet(ctx, keys...)
+	existM, err := f.ca.cache.MGet(ctx, keys...)
 	if err != nil {
 		return false, err
 	}
 
-	missKVs, missM, err := f.fetchSourceMiss(ctx, keys, m, extra...)
+	missKVs, missM, err := f.fetchSourceMiss(ctx, keys, existM, extra...)
 	if err != nil {
 		return false, err
 	}
@@ -128,7 +128,7 @@ func (f *Fetcher) mget(ctx context.Context, keys []string, res interface{},
 	if err != nil {
 		return false, err
 	}
-	return f.merge(keys, m, missM, tmpResType, tmpResVal)
+	return f.merge(keys, existM, missM, tmpResType, tmpResVal)
 }
 
 func (f *Fetcher) MDel(ctx context.Context, keys ...string) error {
@@ -187,10 +187,10 @@ func (hf *HFetcher) HDel(ctx context.Context, key string) error {
 }
 
 func (f *Fetcher) fetchSourceMiss(ctx context.Context, keys []string,
-	m map[string][]byte, extra ...interface{}) ([]*cache.KV, map[string]interface{}, error) {
+	existM map[string][]byte, extra ...interface{}) ([]*cache.KV, map[string]interface{}, error) {
 	var missKeys []string
 	for _, key := range keys {
-		if _, ok := m[key]; ok {
+		if _, ok := existM[key]; ok {
 			continue
 		}
 		missKeys = append(missKeys, key)
@@ -235,10 +235,10 @@ func (f *Fetcher) fetchSourceMiss(ctx context.Context, keys []string,
 }
 
 func (hf *HFetcher) fetchSourceMiss(ctx context.Context, key string, fields []string,
-	m map[string][]byte, extra ...interface{}) ([]*cache.KV, map[string]interface{}, error) {
+	existM map[string][]byte, extra ...interface{}) ([]*cache.KV, map[string]interface{}, error) {
 	var missFields []string
 	for _, key := range fields {
-		if _, ok := m[key]; ok {
+		if _, ok := existM[key]; ok {
 			continue
 		}
 		missFields = append(missFields, key)
