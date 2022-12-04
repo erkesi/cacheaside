@@ -294,11 +294,11 @@ func (_f *_Fetcher) merge(keys []string, exsitM map[string][]byte, missM map[str
 		if err != nil {
 			return false, err
 		}
+        // fmt.Printf("1: %s - %s - %v -%t \n",k, string(data), v.Interface(), v.Elem().IsZero())
         if v.Elem().IsZero() {
             continue
         }
-        // fmt.Printf("1: %s - %s - %v -%t \n",k, string(data), v.Interface(), v.Elem().IsZero())
-		key2RefVal[k] = v
+        key2RefVal[k] = v
 	}
 	for i, key := range keys {
 		var rv reflect.Value
