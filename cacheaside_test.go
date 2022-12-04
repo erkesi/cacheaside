@@ -151,10 +151,6 @@ func TestGet(t *testing.T) {
 		key2bs := make(map[string][]byte)
 		for _, key := range keys {
 			if u, ok := id2User[key]; ok {
-				if u == nil {
-					key2bs[key] = nil
-					continue
-				}
 				bs, err := json.Marshal(u)
 				if err != nil {
 					return nil, err

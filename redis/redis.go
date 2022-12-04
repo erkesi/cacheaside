@@ -46,33 +46,16 @@ func (r *RedisWrap) MGet(ctx context.Context, keys ...string) (map[string][]byte
 	if len(keys) == 0 {
 		return nil, nil
 	}
-	pipeline := r.cli.WithContext(ctx).Pipeline()
-	defer func() {
-		_ = pipeline.Close()
-	}()
-
-	resList := make([]*redis.StringCmd, len(keys))
-	for i, key := range keys {
-		resList[i] = pipeline.Get(key)
-	}
-	_, err := pipeline.Exec()
+	vals, err := r.cli.WithContext(ctx).MGet(keys...).Result()
 	if err != nil {
 		return nil, err
 	}
-	key2Data := make(map[string][]byte, len(keys))
-	for i, res := range resList {
-		data, err := res.Bytes()
-		if err == nil {
-			key2Data[keys[i]] = data
+	key2Data := make(map[string][]byte)
+	for i, v := range vals {
+        if v == nil {
 			continue
 		}
-		if err == redis.Nil {
-			key2Data[keys[i]] = nil
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
+		key2Data[keys[i]] = []byte(v.(string))
 	}
 	return key2Data, nil
 }
@@ -94,7 +77,7 @@ func (r *RedisWrap) HMSet(ctx context.Context, key string, ttl time.Duration, kv
 	}()
 	var resList []redis.Cmder
 	for _, kv := range kvs {
-		resList = append(resList, pipeline.Set(kv.Key, kv.Data, ttl))
+		resList = append(resList, pipeline.HSet(key, kv.Key, kv.Data))
 	}
 	resList = append(resList, pipeline.Expire(key, ttl))
 	_, err := pipeline.Exec()
@@ -113,33 +96,16 @@ func (r *RedisWrap) HMGet(ctx context.Context, key string, fields ...string) (ma
 	if len(fields) == 0 {
 		return nil, nil
 	}
-	pipeline := r.cli.WithContext(ctx).Pipeline()
-	defer func() {
-		_ = pipeline.Close()
-	}()
-
-	resList := make([]*redis.StringCmd, len(fields))
-	for i, field := range fields {
-		resList[i] = pipeline.HGet(key, field)
-	}
-	_, err := pipeline.Exec()
+	vals, err := r.cli.WithContext(ctx).HMGet(key, fields...).Result()
 	if err != nil {
 		return nil, err
 	}
-	key2Data := make(map[string][]byte, len(fields))
-	for i, res := range resList {
-		data, err := res.Bytes()
-		if err == nil {
-			key2Data[fields[i]] = data
+	key2Data := make(map[string][]byte)
+	for i, v := range vals {
+		if v == nil {
 			continue
 		}
-		if err == redis.Nil {
-			key2Data[fields[i]] = nil
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
+		key2Data[fields[i]] = []byte(v.(string))
 	}
 	return key2Data, nil
 }
