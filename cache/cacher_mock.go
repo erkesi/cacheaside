@@ -89,7 +89,7 @@ func (mr *MockHCacherMockRecorder) HMGet(ctx, key interface{}, fields ...interfa
 }
 
 // HMSet mocks base method.
-func (m *MockHCacher) HMSet(ctx context.Context, key string, ttl time.Duration, kvs ...*KV) error {
+func (m *MockHCacher) HMSet(ctx context.Context, key string, ttl *time.Duration, kvs ...*KV) error {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{ctx, key, ttl}
 	for _, a := range kvs {
@@ -170,7 +170,7 @@ func (mr *MockCacherMockRecorder) MGet(ctx interface{}, keys ...interface{}) *go
 }
 
 // MSet mocks base method.
-func (m *MockCacher) MSet(ctx context.Context, ttl time.Duration, kvs ...*KV) error {
+func (m *MockCacher) MSet(ctx context.Context, ttl *time.Duration, kvs ...*KV) error {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{ctx, ttl}
 	for _, a := range kvs {
