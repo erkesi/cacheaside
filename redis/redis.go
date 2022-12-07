@@ -18,7 +18,7 @@ func NewRedisWrap(cli *redis.Client) *RedisWrap {
 	}
 }
 
-func (r *RedisWrap) MSet(ctx context.Context, ttl time.Duration, kvs ...*cache.KV) error {
+func (r *RedisWrap) MSet(ctx context.Context, ttl *time.Duration, kvs ...*cache.KV) error {
 	if len(kvs) == 0 {
 		return nil
 	}
@@ -28,7 +28,11 @@ func (r *RedisWrap) MSet(ctx context.Context, ttl time.Duration, kvs ...*cache.K
 	}()
 	resList := make([]*redis.StatusCmd, len(kvs))
 	for i, kv := range kvs {
-		resList[i] = pipeline.Set(kv.Key, kv.Data, ttl)
+        if ttl == nil {
+            resList[i] = pipeline.Set(kv.Key, kv.Data, -1)
+        }else{
+            resList[i] = pipeline.Set(kv.Key, kv.Data, *ttl)
+        }
 	}
 	_, err := pipeline.Exec()
 	if err != nil {
@@ -67,7 +71,7 @@ func (r *RedisWrap) MDel(ctx context.Context, keys ...string) error {
 	return r.cli.WithContext(ctx).Del(keys...).Err()
 }
 
-func (r *RedisWrap) HMSet(ctx context.Context, key string, ttl time.Duration, kvs ...*cache.KV) error {
+func (r *RedisWrap) HMSet(ctx context.Context, key string, ttl *time.Duration, kvs ...*cache.KV) error {
 	if len(kvs) == 0 {
 		return nil
 	}
@@ -79,7 +83,9 @@ func (r *RedisWrap) HMSet(ctx context.Context, key string, ttl time.Duration, kv
 	for _, kv := range kvs {
 		resList = append(resList, pipeline.HSet(key, kv.Key, kv.Data))
 	}
-	resList = append(resList, pipeline.Expire(key, ttl))
+    if ttl != nil {
+        resList = append(resList, pipeline.Expire(key, *ttl))
+    }
 	_, err := pipeline.Exec()
 	if err != nil {
 		return err
