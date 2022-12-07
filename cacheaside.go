@@ -90,7 +90,7 @@ const (
 	StrategyCacheFailBackToSource Strategy = "CacheFailBackToSource"
 	// StrategyFirstUseCache 优先读取缓存（默认）
 	StrategyFirstUseCache Strategy = "CacheFailBackToSource"
-	// StrategyOnlyUseCacheStrategy 仅仅读取缓存
+    // StrategyOnlyUseCache 仅仅读取缓存
 	StrategyOnlyUseCache Strategy = "OnlyCache"
 )
 
