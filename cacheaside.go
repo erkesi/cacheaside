@@ -46,37 +46,83 @@ func NewHCacheAside(code code.Coder, hcache cache.HCacher) *CacheAside {
 	}
 }
 
-func (ca *CacheAside) Fetch(fetchSource FetchSource, genCacheKey GenCacheKey, ttl time.Duration) *Fetcher {
+func (ca *CacheAside) Fetch(fetchSource FetchSource, genCacheKey GenCacheKey, opts ...OptFn) *Fetcher {
+	opt := &Option{}
+	for _, fn := range opts {
+		fn(opt)
+	}
 	return &Fetcher{
 		_Fetcher: &_Fetcher{
 			ca: &CacheAside{
 				code:  ca.code,
 				cache: ca.cache,
 			},
-			ttl: ttl,
+			opt: opt,
 		},
 		fetchSource: fetchSource,
 		genCacheKey: genCacheKey,
 	}
 }
 
-func (ca *CacheAside) HFetch(fetchSource FetchSourceHash, genCacheHashField GenCacheHashField, ttl time.Duration) *HFetcher {
+func (ca *CacheAside) HFetch(fetchSource FetchSourceHash, genCacheHashField GenCacheHashField,
+	opts ...OptFn) *HFetcher {
+	opt := &Option{}
+	for _, fn := range opts {
+		fn(opt)
+	}
 	return &HFetcher{
 		_Fetcher: &_Fetcher{
 			ca: &CacheAside{
 				code:   ca.code,
 				hcache: ca.hcache,
 			},
-			ttl: ttl,
+			opt: opt,
 		},
 		fetchSource:       fetchSource,
 		genCacheHashField: genCacheHashField,
 	}
 }
 
+type Strategy string
+
+const (
+	// StrategyCacheFailBackToSource 读取缓存失败则回源查询
+	StrategyCacheFailBackToSource Strategy = "CacheFailBackToSource"
+	// StrategyFirstUseCache 优先读取缓存（默认）
+	StrategyFirstUseCache Strategy = "CacheFailBackToSource"
+	// StrategyOnlyUseCacheStrategy 仅仅读取缓存
+	StrategyOnlyUseCache Strategy = "OnlyCache"
+)
+
+type Option struct {
+	ttl      *time.Duration
+	strategy *Strategy
+}
+
+func (o *Option) Strategy() Strategy {
+	if o.strategy == nil {
+		return StrategyFirstUseCache
+	}
+	return *o.strategy
+}
+
+type OptFn func(opt *Option)
+
+func WithStrategy(strategy Strategy) OptFn {
+	return func(opt *Option) {
+		opt.strategy = &strategy
+	}
+}
+
+func WithTTL(ttl time.Duration) OptFn {
+	return func(opt *Option) {
+		opt.ttl = &ttl
+	}
+}
+
 type _Fetcher struct {
 	ca  *CacheAside
-	ttl time.Duration
+	opt *Option
 	sfg singleflight.Group
 }
 
@@ -115,16 +161,18 @@ func (f *Fetcher) mget(ctx context.Context, keys []string, res interface{},
 	}
 
 	existM, err := f.ca.cache.MGet(ctx, keys...)
-	if err != nil {
+	if err != nil && f.opt.Strategy() != StrategyCacheFailBackToSource {
 		return false, err
 	}
-
+	if f.opt.Strategy() == StrategyOnlyUseCache {
+        return f.merge(keys, existM, nil, tmpResType, tmpResVal)
+    }
 	missKVs, missM, err := f.fetchSourceMiss(ctx, keys, existM, extra...)
 	if err != nil {
 		return false, err
 	}
 
-	err = f.ca.cache.MSet(ctx, f.ttl, missKVs...)
+	err = f.ca.cache.MSet(ctx, f.opt.ttl, missKVs...)
 	if err != nil {
 		return false, err
 	}
@@ -139,37 +187,44 @@ func (f *Fetcher) MDel(ctx context.Context, keys ...string) error {
 }
 
 func (hf *HFetcher) HGet(ctx context.Context, key, field string, res interface{},
-	extra ...interface{}) error {
-	return hf.HMGet(ctx, key, []string{field}, res, extra...)
+	extra ...interface{}) (bool, error) {
+	return hf.hmGet(ctx, key, []string{field}, res, extra...)
 }
 
 func (hf *HFetcher) HMGet(ctx context.Context, key string, fields []string, res interface{},
 	extra ...interface{}) error {
+	_, err := hf.hmGet(ctx, key, fields, res, extra...)
+	return err
+}
+
+func (hf *HFetcher) hmGet(ctx context.Context, key string, fields []string, res interface{},
+	extra ...interface{}) (bool, error) {
 	if err := hf.check(); err != nil {
-		return err
+		return false, err
 	}
 	tmpResType, tmpResVal, err := hf.resRelVal(len(fields), res)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	m, err := hf.ca.hcache.HMGet(ctx, key, fields...)
-	if err != nil {
-		return err
+	existM, err := hf.ca.hcache.HMGet(ctx, key, fields...)
+	if err != nil && hf.opt.Strategy() != StrategyCacheFailBackToSource {
+		return false, err
 	}
-
-	missKVs, missM, err := hf.fetchSourceMiss(ctx, key, fields, m, extra...)
+	if hf.opt.Strategy() == StrategyOnlyUseCache {
+        return hf.merge(fields, existM, nil, tmpResType, tmpResVal)
+	}
+	missKVs, missM, err := hf.fetchSourceMiss(ctx, key, fields, existM, extra...)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if len(missKVs) > 0 {
-		err = hf.ca.hcache.HMSet(ctx, key, hf.ttl, missKVs...)
+		err = hf.ca.hcache.HMSet(ctx, key, hf.opt.ttl, missKVs...)
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
-	_, err = hf.merge(fields, m, missM, tmpResType, tmpResVal)
-	return err
+	return hf.merge(fields, existM, missM, tmpResType, tmpResVal)
 }
 
 func (hf *HFetcher) HMDel(ctx context.Context, key string, fields ...string) error {
@@ -294,11 +349,11 @@ func (_f *_Fetcher) merge(keys []string, exsitM map[string][]byte, missM map[str
 		if err != nil {
 			return false, err
 		}
-        // fmt.Printf("1: %s - %s - %v -%t \n",k, string(data), v.Interface(), v.Elem().IsZero())
-        if v.Elem().IsZero() {
-            continue
-        }
-        key2RefVal[k] = v
+		// fmt.Printf("1: %s - %s - %v -%t \n",k, string(data), v.Interface(), v.Elem().IsZero())
+		if v.Elem().IsZero() {
+			continue
+		}
+		key2RefVal[k] = v
 	}
 	for i, key := range keys {
 		var rv reflect.Value

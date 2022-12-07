@@ -13,6 +13,7 @@ import (
 )
 
 func TestHCache(t *testing.T) {
+    
 	type User struct {
 		Extra map[string]string
 	}
@@ -64,8 +65,8 @@ func TestHCache(t *testing.T) {
 		return nil
 	})
 	mhcache.EXPECT().HMSet(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, key string, ttl time.Duration, kvs ...*cache.KV) error {
-			fmt.Println(ttl)
+		func(ctx context.Context, key string, ttl *time.Duration, kvs ...*cache.KV) error {
+			fmt.Println(*ttl)
 			for _, kv := range kvs {
 				fmt.Printf("Mset: kv:%v-%v-%v\n\n", kv.Key, string(kv.Data), kv.Val)
 				if kv.Key != "nil" {
@@ -100,7 +101,7 @@ func TestHCache(t *testing.T) {
 		}
 		ctrl.T.Fatalf("%v", "gen hash field error")
 		return "", nil
-	}, time.Hour)
+	}, WithTTL(time.Hour))
 
 	var us []*User
 	err := caf.HMGet(context.Background(), "1", []string{"nil", "Name", "Age"}, &us)
@@ -162,7 +163,7 @@ func TestGet(t *testing.T) {
 	}).AnyTimes()
 
 	mcache.EXPECT().MSet(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, ttl time.Duration, kvs ...*cache.KV) error {
+		func(ctx context.Context, ttl *time.Duration, kvs ...*cache.KV) error {
 			for _, kv := range kvs {
 				fmt.Printf("Mset: kv:%v-%v-%v\n\n", kv.Key, string(kv.Data), kv.Val)
 				if kv.Key != "nil" {
@@ -193,7 +194,7 @@ func TestGet(t *testing.T) {
 		return res, nil
 	}, func(ctx context.Context, v interface{}, extra ...interface{}) (string, error) {
 		return v.(*User).Id, nil
-	}, time.Hour)
+    }, WithTTL(time.Hour))
 
 	var u0, u1, u2, u_nil User
 	ok, err := caf.Get(context.Background(), "0", &u0)
@@ -277,8 +278,8 @@ func TestMGetAndMDel(t *testing.T) {
 		return nil
 	})
 	mcache.EXPECT().MSet(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, ttl time.Duration, kvs ...*cache.KV) error {
-			fmt.Println(ttl)
+		func(ctx context.Context, ttl *time.Duration, kvs ...*cache.KV) error {
+			fmt.Println(*ttl)
 			for _, kv := range kvs {
 				fmt.Printf("Mset: kv:%v-%v-%v\n\n", kv.Key, string(kv.Data), kv.Val)
 				if kv.Key != "nil" {
@@ -309,7 +310,7 @@ func TestMGetAndMDel(t *testing.T) {
 		return res, nil
 	}, func(ctx context.Context, v interface{}, extra ...interface{}) (string, error) {
 		return v.(*User).Id, nil
-	}, time.Hour)
+    }, WithTTL(time.Hour))
 
 	var us []*User
 	err := caf.MGet(context.Background(), []string{"0", "1", "2", "nil"}, &us)

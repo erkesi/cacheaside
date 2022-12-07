@@ -2,8 +2,8 @@ github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/erkesi/cacheaside/cache v1.0.1 h1:SXcBCBrwe0ZKSa25J1vc6hx3IWE7Bo0LGqf24a1eD9Y=
 github.com/erkesi/cacheaside/cache v1.0.1/go.mod h1:Fgi5+DNce0IuCKvZ3yH7ysz3wrU7TfATX9wb7zEEOvQ=
-github.com/erkesi/cacheaside/code v0.0.0-20221203150505-c72b5587cde2 h1:ZSTQxMpGSVnLLYW3WK9YRO0w/8MOZs6etKogcrPoK5k=
-github.com/erkesi/cacheaside/code v0.0.0-20221203150505-c72b5587cde2/go.mod h1:68+nfPiNlB9RmgOW4dKaqY1yUPlpsMRZIxYOLCKdGhI=
+github.com/erkesi/cacheaside/code v1.0.1 h1:yNR+gUHByAuhQTr2nD0klOXLtutAhnShGcMK78+a8oI=
+github.com/erkesi/cacheaside/code v1.0.1/go.mod h1:68+nfPiNlB9RmgOW4dKaqY1yUPlpsMRZIxYOLCKdGhI=
 github.com/golang/mock v1.6.0 h1:ErTB+efbowRARo13NNdxyJji2egdxLGQhRaY+DUumQc=
 github.com/golang/mock v1.6.0/go.mod h1:p6yTPP+5HYm5mzsMV8JkE6ZKdX+/wYM6Hr+LicevLPs=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
