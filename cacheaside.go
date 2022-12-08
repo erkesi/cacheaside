@@ -30,25 +30,31 @@ type CacheAside struct {
 	code   code.Coder
 	cache  cache.Cacher
 	hcache cache.HCacher
+	opts   []OptFn
 }
 
-func NewCacheAside(code code.Coder, cache cache.Cacher) *CacheAside {
+func NewCacheAside(code code.Coder, cache cache.Cacher, opts ...OptFn) *CacheAside {
 	return &CacheAside{
 		code:  code,
 		cache: cache,
+		opts:  opts,
 	}
 }
 
-func NewHCacheAside(code code.Coder, hcache cache.HCacher) *CacheAside {
+func NewHCacheAside(code code.Coder, hcache cache.HCacher, opts ...OptFn) *CacheAside {
 	return &CacheAside{
 		code:   code,
 		hcache: hcache,
+		opts:   opts,
 	}
 }
 
 func (ca *CacheAside) Fetch(fetchSource FetchSource, genCacheKey GenCacheKey, opts ...OptFn) *Fetcher {
 	opt := &Option{}
-	for _, fn := range opts {
+	var allOpts []OptFn
+	allOpts = append(allOpts, ca.opts...)
+	allOpts = append(allOpts, opts...)
+	for _, fn := range allOpts {
 		fn(opt)
 	}
 	return &Fetcher{
@@ -64,10 +70,12 @@ func (ca *CacheAside) Fetch(fetchSource FetchSource, genCacheKey GenCacheKey, op
 	}
 }
 
-func (ca *CacheAside) HFetch(fetchSource FetchSourceHash, genCacheHashField GenCacheHashField,
-	opts ...OptFn) *HFetcher {
+func (ca *CacheAside) HFetch(fetchSource FetchSourceHash, genCacheHashField GenCacheHashField, opts ...OptFn) *HFetcher {
 	opt := &Option{}
-	for _, fn := range opts {
+	var allOpts []OptFn
+	allOpts = append(allOpts, ca.opts...)
+	allOpts = append(allOpts, opts...)
+	for _, fn := range allOpts {
 		fn(opt)
 	}
 	return &HFetcher{
@@ -90,13 +98,14 @@ const (
 	StrategyCacheFailBackToSource Strategy = "CacheFailBackToSource"
 	// StrategyFirstUseCache 优先读取缓存（默认）
 	StrategyFirstUseCache Strategy = "CacheFailBackToSource"
-    // StrategyOnlyUseCache 仅仅读取缓存
+	// StrategyOnlyUseCache 仅仅读取缓存
 	StrategyOnlyUseCache Strategy = "OnlyCache"
 )
 
 type Option struct {
 	ttl      *time.Duration
 	strategy *Strategy
+	log      Logger
 }
 
 func (o *Option) Strategy() Strategy {
@@ -111,6 +120,12 @@ type OptFn func(opt *Option)
 func WithStrategy(strategy Strategy) OptFn {
 	return func(opt *Option) {
 		opt.strategy = &strategy
+	}
+}
+
+func WithLogger(log Logger) OptFn {
+	return func(opt *Option) {
+		opt.log = log
 	}
 }
 
@@ -155,28 +170,33 @@ func (f *Fetcher) mget(ctx context.Context, keys []string, res interface{},
 		return false, err
 	}
 
-	tmpResType, tmpResVal, err := f.resRelVal(len(keys), res)
+	resType, resVal, err := f.resRelVal(len(keys), res)
 	if err != nil {
 		return false, err
 	}
 
 	existM, err := f.ca.cache.MGet(ctx, keys...)
-	if err != nil && f.opt.Strategy() != StrategyCacheFailBackToSource {
-		return false, err
+	if err != nil {
+		if f.opt.Strategy() != StrategyCacheFailBackToSource {
+			return false, err
+		}
+		if f.opt.log != nil {
+			f.opt.log.Wranf(ctx, "cacheaside: cache.MGet error:%w", err)
+		}
 	}
 	if f.opt.Strategy() == StrategyOnlyUseCache {
-        return f.merge(keys, existM, nil, tmpResType, tmpResVal)
-    }
+		return f.merge(keys, existM, nil, resType, resVal)
+	}
 	missKVs, missM, err := f.fetchSourceMiss(ctx, keys, existM, extra...)
 	if err != nil {
 		return false, err
 	}
 
 	err = f.ca.cache.MSet(ctx, f.opt.ttl, missKVs...)
-	if err != nil {
-		return false, err
+	if err != nil && f.opt.log != nil {
+		f.opt.log.Wranf(ctx, "cacheaside: cache.MSet error:%w", err)
 	}
-	return f.merge(keys, existM, missM, tmpResType, tmpResVal)
+	return f.merge(keys, existM, missM, resType, resVal)
 }
 
 func (f *Fetcher) MDel(ctx context.Context, keys ...string) error {
@@ -208,11 +228,16 @@ func (hf *HFetcher) hmGet(ctx context.Context, key string, fields []string, res 
 	}
 
 	existM, err := hf.ca.hcache.HMGet(ctx, key, fields...)
-	if err != nil && hf.opt.Strategy() != StrategyCacheFailBackToSource {
-		return false, err
+	if err != nil {
+		if hf.opt.Strategy() != StrategyCacheFailBackToSource {
+			return false, err
+		}
+		if hf.opt.log != nil {
+			hf.opt.log.Wranf(ctx, "cacheaside: cache.HMGet error:%w", err)
+		}
 	}
 	if hf.opt.Strategy() == StrategyOnlyUseCache {
-        return hf.merge(fields, existM, nil, tmpResType, tmpResVal)
+		return hf.merge(fields, existM, nil, tmpResType, tmpResVal)
 	}
 	missKVs, missM, err := hf.fetchSourceMiss(ctx, key, fields, existM, extra...)
 	if err != nil {
@@ -220,8 +245,8 @@ func (hf *HFetcher) hmGet(ctx context.Context, key string, fields []string, res 
 	}
 	if len(missKVs) > 0 {
 		err = hf.ca.hcache.HMSet(ctx, key, hf.opt.ttl, missKVs...)
-		if err != nil {
-			return false, err
+		if err != nil && hf.opt.log != nil {
+			hf.opt.log.Wranf(ctx, "cacheaside: cache.HMSet error:%w", err)
 		}
 	}
 	return hf.merge(fields, existM, missM, tmpResType, tmpResVal)
@@ -255,8 +280,12 @@ func (f *Fetcher) fetchSourceMiss(ctx context.Context, keys []string,
 	}
 	sort.Strings(missKeys)
 	vals, err, _ := f.sfg.Do(fmt.Sprintf("[%s]", strings.Join(missKeys, ",")),
-		func() (v interface{}, e error) {
-			return f.fetchSource(ctx, missKeys, extra...)
+		func() (interface{}, error) {
+			v, e := f.fetchSource(ctx, missKeys, extra...)
+			if e != nil {
+				return nil, fmt.Errorf("cacheaside: Fetcher.fetchSource error:%w", e)
+			}
+			return v, nil
 		})
 	if err != nil {
 		return nil, nil, err
@@ -265,7 +294,7 @@ func (f *Fetcher) fetchSourceMiss(ctx context.Context, keys []string,
 	for _, v := range vals.([]interface{}) {
 		key, err := f.genCacheKey(ctx, v, extra...)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("cacheaside: Fetcher.genCacheKey error:%w", err)
 		}
 		missM[key] = v
 	}
@@ -303,8 +332,12 @@ func (hf *HFetcher) fetchSourceMiss(ctx context.Context, key string, fields []st
 	}
 	sort.Strings(missFields)
 	vals, err, _ := hf.sfg.Do(fmt.Sprintf("[%s]", strings.Join(missFields, ",")),
-		func() (v interface{}, e error) {
-			return hf.fetchSource(ctx, key, missFields, extra...)
+		func() (interface{}, error) {
+			v, e := hf.fetchSource(ctx, key, missFields, extra...)
+			if e != nil {
+				return nil, fmt.Errorf("cacheaside: HFetcher.fetchSource error:%w", e)
+			}
+			return v, nil
 		})
 	if err != nil {
 		return nil, nil, err
@@ -313,7 +346,7 @@ func (hf *HFetcher) fetchSourceMiss(ctx context.Context, key string, fields []st
 	for _, v := range vals.([]interface{}) {
 		field, err := hf.genCacheHashField(ctx, v, extra...)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("cacheaside: HFetcher.genCacheHashField error:%w", err)
 		}
 		missM[field] = v
 	}
@@ -434,4 +467,9 @@ func (_f *_Fetcher) resRelVal(size int, res interface{}) (reflect.Type, reflect.
 		}
 	}
 	return tmpResType, tmpResVal, nil
+}
+
+type Logger interface {
+	Debugf(ctx context.Context, format string, v ...interface{})
+	Wranf(ctx context.Context, format string, v ...interface{})
 }
