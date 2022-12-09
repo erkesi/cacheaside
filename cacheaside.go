@@ -103,23 +103,62 @@ const (
 )
 
 type Option struct {
-	ttl      *time.Duration
-	strategy *Strategy
-	log      Logger
+	ttl                   *time.Duration
+	log                   Logger
+	_strategy             *Strategy
+	_cacheGetErrHandler func(ctx context.Context, err error, keys, fields []string, extra ...interface{})
+	_cacheSetErrHandler func(ctx context.Context, err error, keys, fields []string, extra ...interface{}) error
 }
 
-func (o *Option) Strategy() Strategy {
-	if o.strategy == nil {
+func (o *Option) cacheGetErrHandler() func(ctx context.Context, err error, keys, fields []string, extra ...interface{}) {
+	if o._cacheGetErrHandler != nil {
+		return o._cacheGetErrHandler
+	}
+	if o.log != nil {
+		return func(ctx context.Context, err error, keys, fields []string, extra ...interface{}) {
+			o.log.Wranf(ctx, "%v", err)
+		}
+	}
+	return nil
+}
+
+func (o *Option) cacheSetErrHandler() func(ctx context.Context, err error, keys, fields []string, extra ...interface{}) error {
+	if o._cacheGetErrHandler != nil {
+		return o._cacheSetErrHandler
+	}
+	if o.log != nil {
+		return func(ctx context.Context, err error, keys, fields []string, extra ...interface{}) error {
+			o.log.Wranf(ctx, "%v", err)
+			return nil
+		}
+	}
+	return nil
+}
+
+func (o *Option) strategy() Strategy {
+	if o._strategy == nil {
 		return StrategyFirstUseCache
 	}
-	return *o.strategy
+	return *o._strategy
 }
 
 type OptFn func(opt *Option)
 
+func WithcacheGetErrHandler(cacheGetErrHandler func(ctx context.Context, err error, keys, fields []string, extra ...interface{})) OptFn {
+	return func(opt *Option) {
+		opt._cacheGetErrHandler = cacheGetErrHandler
+	}
+}
+
+func WithcacheSetErrHandler(cacheSetErrHandler func(ctx context.Context, err error, keys, fields []string, extra ...interface{}) error) OptFn {
+    return func(opt *Option) {
+        opt._cacheSetErrHandler = cacheSetErrHandler
+    }
+}
+
 func WithStrategy(strategy Strategy) OptFn {
 	return func(opt *Option) {
-		opt.strategy = &strategy
+		opt._strategy = &strategy
 	}
 }
 
@@ -177,24 +216,27 @@ func (f *Fetcher) mget(ctx context.Context, keys []string, res interface{},
 
 	existM, err := f.ca.cache.MGet(ctx, keys...)
 	if err != nil {
-		if f.opt.Strategy() != StrategyCacheFailBackToSource {
+		err = fmt.Errorf("cacheaside: cache.MGet error:%w", err)
+		if f.opt.strategy() != StrategyCacheFailBackToSource {
 			return false, err
 		}
-		if f.opt.log != nil {
-			f.opt.log.Wranf(ctx, "cacheaside: cache.MGet error:%w", err)
+		if f.opt.cacheGetErrHandler() != nil {
+			f.opt.cacheGetErrHandler()(ctx, err, keys, nil, extra...)
 		}
 	}
-	if f.opt.Strategy() == StrategyOnlyUseCache {
+	if f.opt.strategy() == StrategyOnlyUseCache {
 		return f.merge(keys, existM, nil, resType, resVal)
 	}
 	missKVs, missM, err := f.fetchSourceMiss(ctx, keys, existM, extra...)
 	if err != nil {
 		return false, err
 	}
-
 	err = f.ca.cache.MSet(ctx, f.opt.ttl, missKVs...)
-	if err != nil && f.opt.log != nil {
-		f.opt.log.Wranf(ctx, "cacheaside: cache.MSet error:%w", err)
+	if err != nil && f.opt.cacheSetErrHandler() != nil {
+		err = f.opt.cacheSetErrHandler()(ctx, fmt.Errorf("cacheaside: cache.MSet error:%w", err), keys, nil, extra...)
+		if err != nil {
+			return false, err
+		}
 	}
 	return f.merge(keys, existM, missM, resType, resVal)
 }
@@ -229,14 +271,15 @@ func (hf *HFetcher) hmGet(ctx context.Context, key string, fields []string, res 
 
 	existM, err := hf.ca.hcache.HMGet(ctx, key, fields...)
 	if err != nil {
-		if hf.opt.Strategy() != StrategyCacheFailBackToSource {
+		err = fmt.Errorf("cacheaside: cache.HMGet error:%w", err)
+		if hf.opt.strategy() != StrategyCacheFailBackToSource {
 			return false, err
 		}
-		if hf.opt.log != nil {
-			hf.opt.log.Wranf(ctx, "cacheaside: cache.HMGet error:%w", err)
+		if hf.opt.cacheGetErrHandler() != nil {
+			hf.opt.cacheGetErrHandler()(ctx, err, []string{key}, fields, extra...)
 		}
 	}
-	if hf.opt.Strategy() == StrategyOnlyUseCache {
+	if hf.opt.strategy() == StrategyOnlyUseCache {
 		return hf.merge(fields, existM, nil, tmpResType, tmpResVal)
 	}
 	missKVs, missM, err := hf.fetchSourceMiss(ctx, key, fields, existM, extra...)
@@ -245,8 +288,12 @@ func (hf *HFetcher) hmGet(ctx context.Context, key string, fields []string, res 
 	}
 	if len(missKVs) > 0 {
 		err = hf.ca.hcache.HMSet(ctx, key, hf.opt.ttl, missKVs...)
-		if err != nil && hf.opt.log != nil {
-			hf.opt.log.Wranf(ctx, "cacheaside: cache.HMSet error:%w", err)
+		if err != nil && hf.opt.cacheSetErrHandler() != nil {
+			err = hf.opt.cacheSetErrHandler()(ctx, fmt.Errorf("cacheaside: cache.HMSet error:%w", err),
+				[]string{key}, fields, extra...)
+			if err != nil {
+				return false, err
+			}
 		}
 	}
 	return hf.merge(fields, existM, missM, tmpResType, tmpResVal)

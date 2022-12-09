@@ -3,7 +3,7 @@ package cacheaside
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+    "fmt"
 	"github.com/erkesi/cacheaside/cache"
 	"github.com/erkesi/cacheaside/code"
 	"github.com/golang/mock/gomock"
@@ -13,7 +13,7 @@ import (
 )
 
 func TestHCache(t *testing.T) {
-    
+
 	type User struct {
 		Extra map[string]string
 	}
@@ -51,12 +51,12 @@ func TestHCache(t *testing.T) {
 		return key2bs, nil
 	})
 
-    mhcache.EXPECT().HDel(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, key string) error {
-        if key != "1"  {
-            ctrl.T.Fatalf("%v", "not equal")
-        }
-        return nil
-    })
+	mhcache.EXPECT().HDel(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, key string) error {
+		if key != "1" {
+			ctrl.T.Fatalf("%v", "not equal")
+		}
+		return nil
+	})
 
 	mhcache.EXPECT().HMDel(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, key string, fields ...string) error {
 		if key != "1" || len(fields) != 2 || fields[0] != "Name" || fields[1] != "Age" {
@@ -112,15 +112,15 @@ func TestHCache(t *testing.T) {
 	if len(us) != 3 || us[0] != nil || us[1].Extra["Name"] != "Name" || us[2].Extra["Age"] != "Age" {
 		t.Fatal("us not equal nil")
 	}
-	err = caf.HMDel(context.Background(),"1", "Name", "Age")
+	err = caf.HMDel(context.Background(), "1", "Name", "Age")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-    err = caf.HDel(context.Background(),"1")
-    if err != nil {
-        t.Fatal(err)
-    }
+	err = caf.HDel(context.Background(), "1")
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestGet(t *testing.T) {
@@ -194,7 +194,7 @@ func TestGet(t *testing.T) {
 		return res, nil
 	}, func(ctx context.Context, v interface{}, extra ...interface{}) (string, error) {
 		return v.(*User).Id, nil
-    }, WithTTL(time.Hour))
+	}, WithTTL(time.Hour))
 
 	var u0, u1, u2, u_nil User
 	ok, err := caf.Get(context.Background(), "0", &u0)
@@ -310,7 +310,7 @@ func TestMGetAndMDel(t *testing.T) {
 		return res, nil
 	}, func(ctx context.Context, v interface{}, extra ...interface{}) (string, error) {
 		return v.(*User).Id, nil
-    }, WithTTL(time.Hour))
+	}, WithTTL(time.Hour), WithLogger(&_Logger{t:t}))
 
 	var us []*User
 	err := caf.MGet(context.Background(), []string{"0", "1", "2", "nil"}, &us)
@@ -325,4 +325,15 @@ func TestMGetAndMDel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+type _Logger struct {
+	t *testing.T
+}
+
+func (l *_Logger) Debugf(ctx context.Context, format string, v ...interface{}) {
+	l.t.Logf(format, v...)
+}
+func (l *_Logger) Wranf(ctx context.Context, format string, v ...interface{}) {
+	l.t.Logf(format, v...)
 }
