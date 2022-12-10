@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/erkesi/cacheaside/code"
-	csredis "github.com/erkesi/cacheaside/redis"
+	"github.com/erkesi/cacheaside/caredis"
 	"github.com/go-redis/redis"
 )
 
@@ -30,7 +30,7 @@ func demo() {
 		}
 	}
 
-	ca := NewHCacheAside(&code.Json{}, &csredis.NewRedisWrap(&redis.NewClient(&redis.Options{
+	ca := NewHCacheAside(&code.Json{}, &caredis.NewRedisWrap(&redis.NewClient(&redis.Options{
 		Addr: "127.0.0.1:6379",
 	})))
 
@@ -108,7 +108,7 @@ func demo() {
 		}
 	}
 
-	ca := NewCacheAside(&code.Json{}, &csredis.NewRedisWrap(&redis.NewClient(&redis.Options{
+	ca := NewCacheAside(&code.Json{}, &caredis.NewRedisWrap(&redis.NewClient(&redis.Options{
 		Addr: "127.0.0.1:6379",
 	})))
 	caf := ca.Fetch(
