@@ -1,4 +1,4 @@
-module github.com/erkesi/cacheaside/redis
+module github.com/erkesi/cacheaside/caredis
 
 go 1.16
 
