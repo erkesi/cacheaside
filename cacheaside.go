@@ -122,7 +122,8 @@ func (o *Option) cacheGetErrHandler() func(ctx context.Context, err error, keys,
 	return nil
 }
 
-func (o *Option) cacheSetErrHandler() func(ctx context.Context, err error, keys, fields []string, extra ...interface{}) error {
+func (o *Option) cacheSetErrHandler() func(ctx context.Context, err error, keys, fields []string,
+    extra ...interface{}) error {
 	if o._cacheGetErrHandler != nil {
 		return o._cacheSetErrHandler
 	}
@@ -144,13 +145,15 @@ func (o *Option) strategy() Strategy {
 
 type OptFn func(opt *Option)
 
-func WithcacheGetErrHandler(cacheGetErrHandler func(ctx context.Context, err error, keys, fields []string, extra ...interface{})) OptFn {
+func WithcacheGetErrHandler(cacheGetErrHandler func(ctx context.Context, err error, keys, fields []string,
+    extra ...interface{})) OptFn {
 	return func(opt *Option) {
 		opt._cacheGetErrHandler = cacheGetErrHandler
 	}
 }
 
-func WithcacheSetErrHandler(cacheSetErrHandler func(ctx context.Context, err error, keys, fields []string, extra ...interface{}) error) OptFn {
+func WithcacheSetErrHandler(cacheSetErrHandler func(ctx context.Context, err error, keys, fields []string,
+    extra ...interface{}) error) OptFn {
     return func(opt *Option) {
         opt._cacheSetErrHandler = cacheSetErrHandler
     }
@@ -233,7 +236,8 @@ func (f *Fetcher) mget(ctx context.Context, keys []string, res interface{},
 	}
 	err = f.ca.cache.MSet(ctx, f.opt.ttl, missKVs...)
 	if err != nil && f.opt.cacheSetErrHandler() != nil {
-		err = f.opt.cacheSetErrHandler()(ctx, fmt.Errorf("cacheaside: cache.MSet error:%w", err), keys, nil, extra...)
+		err = f.opt.cacheSetErrHandler()(ctx,
+            fmt.Errorf("cacheaside: cache.MSet error:%w", err), keys, nil, extra...)
 		if err != nil {
 			return false, err
 		}
