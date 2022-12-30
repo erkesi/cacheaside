@@ -8,7 +8,8 @@ import (
 	"github.com/erkesi/cacheaside/code"
 	"github.com/golang/mock/gomock"
 	"reflect"
-	"testing"
+    "strings"
+    "testing"
 	"time"
 )
 
@@ -52,14 +53,14 @@ func TestHCache(t *testing.T) {
 	})
 
 	mhcache.EXPECT().HDel(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, key string) error {
-		if key != "1" {
+        if key != "ns$1" {
 			ctrl.T.Fatalf("%v", "not equal")
 		}
 		return nil
 	})
 
 	mhcache.EXPECT().HMDel(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, key string, fields ...string) error {
-		if key != "1" || len(fields) != 2 || fields[0] != "Name" || fields[1] != "Age" {
+		if key != "ns$1" || len(fields) != 2 || fields[0] != "Name" || fields[1] != "Age" {
 			ctrl.T.Fatalf("%v", "not equal")
 		}
 		return nil
@@ -84,7 +85,7 @@ func TestHCache(t *testing.T) {
 			return nil
 		})
 
-	ca := NewHCacheAside(&code.Json{}, mhcache)
+	ca := NewHCacheAside(&code.Json{}, mhcache, "ns")
 
 	caf := ca.HFetch(func(ctx context.Context, key string, fields []string, extra ...interface{}) ([]interface{}, error) {
 		var res []interface{}
@@ -132,6 +133,7 @@ func TestGet(t *testing.T) {
 	}
 
 	genUser := func(key string) *User {
+        key = strings.TrimPrefix(key, "ns$")
 		return &User{
 			Id:   key,
 			Name: "name" + key,
@@ -140,8 +142,8 @@ func TestGet(t *testing.T) {
 	}
 
 	id2User := make(map[string]*User)
-	id2User["0"] = nil
-	id2User["1"] = genUser("1")
+	id2User["ns$0"] = nil
+    id2User["ns$1"] = genUser("1")
 
 	ctrl := gomock.NewController(t)
 	// Assert that Bar() is invoked.
@@ -166,7 +168,7 @@ func TestGet(t *testing.T) {
 		func(ctx context.Context, ttl *time.Duration, kvs ...*cache.KV) error {
 			for _, kv := range kvs {
 				fmt.Printf("Mset: kv:%v-%v-%v\n\n", kv.Key, string(kv.Data), kv.Val)
-				if kv.Key != "nil" {
+                if kv.Key != "ns$nil" {
 					bs, err := json.Marshal(genUser(kv.Key))
 					if err != nil {
 						ctrl.T.Fatalf("%v", err)
@@ -181,15 +183,15 @@ func TestGet(t *testing.T) {
 			return nil
 		}).AnyTimes()
 
-	ca := NewCacheAside(&code.Json{}, mcache)
+    ca := NewCacheAside(&code.Json{}, mcache, "ns")
 
 	caf := ca.Fetch(func(ctx context.Context, keys []string, extra ...interface{}) ([]interface{}, error) {
 		var res []interface{}
 		for _, key := range keys {
-			if key == "nil" {
+			if key == "ns$nil" {
 				continue
 			}
-			res = append(res, genUser(key))
+            res = append(res, genUser(key))
 		}
 		return res, nil
 	}, func(ctx context.Context, v interface{}, extra ...interface{}) (string, error) {
@@ -204,11 +206,11 @@ func TestGet(t *testing.T) {
 	if ok != false {
 		t.Fatal("uo not equal nil")
 	}
-	ok, err = caf.Get(context.Background(), "1", &u1)
+    ok, err = caf.Get(context.Background(), "1", &u1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(&u1, genUser("1")) {
+    if !reflect.DeepEqual(&u1, genUser("1")) {
 		t.Fatal("u1, not equal")
 	}
 
@@ -216,7 +218,7 @@ func TestGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(&u2, genUser("2")) {
+    if !reflect.DeepEqual(&u2, genUser("2")) {
 		t.Fatal("u2, not equal")
 	}
 
@@ -238,6 +240,7 @@ func TestMGetAndMDel(t *testing.T) {
 	}
 
 	genUser := func(key string) *User {
+        key = strings.TrimPrefix(key, "ns$")
 		return &User{
 			Id:   key,
 			Name: "name" + key,
@@ -246,8 +249,8 @@ func TestMGetAndMDel(t *testing.T) {
 	}
 
 	id2User := make(map[string]*User)
-	id2User["0"] = nil
-	id2User["1"] = genUser("1")
+	id2User["ns$0"] = nil
+    id2User["ns$1"] = genUser("1")
 
 	ctrl := gomock.NewController(t)
 	// Assert that Bar() is invoked.
@@ -272,7 +275,7 @@ func TestMGetAndMDel(t *testing.T) {
 		return key2bs, nil
 	})
 	mcache.EXPECT().MDel(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, keys ...string) error {
-		if len(keys) != 2 || keys[0] != "0" || keys[1] != "1" {
+        if len(keys) != 2 || keys[0] != "ns$0" || keys[1] != "ns$1" {
 			ctrl.T.Fatalf("%v", "not equal")
 		}
 		return nil
@@ -282,7 +285,7 @@ func TestMGetAndMDel(t *testing.T) {
 			fmt.Println(*ttl)
 			for _, kv := range kvs {
 				fmt.Printf("Mset: kv:%v-%v-%v\n\n", kv.Key, string(kv.Data), kv.Val)
-				if kv.Key != "nil" {
+				if kv.Key != "ns$nil" {
 					bs, err := json.Marshal(genUser(kv.Key))
 					if err != nil {
 						ctrl.T.Fatalf("%v", err)
@@ -297,12 +300,12 @@ func TestMGetAndMDel(t *testing.T) {
 			return nil
 		})
 
-	ca := NewCacheAside(&code.Json{}, mcache)
+    ca := NewCacheAside(&code.Json{}, mcache, "ns")
 
 	caf := ca.Fetch(func(ctx context.Context, keys []string, extra ...interface{}) ([]interface{}, error) {
 		var res []interface{}
 		for _, key := range keys {
-			if key == "nil" {
+			if key == "ns$nil" {
 				continue
 			}
 			res = append(res, genUser(key))

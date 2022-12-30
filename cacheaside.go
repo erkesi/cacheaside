@@ -14,6 +14,10 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
+const (
+	keyFormat = "%s$%s"
+)
+
 type FetchSource func(ctx context.Context, keys []string,
 	extra ...interface{}) ([]interface{}, error)
 
@@ -27,25 +31,28 @@ type GenCacheHashField func(ctx context.Context, v interface{},
 	extra ...interface{}) (string, error)
 
 type CacheAside struct {
-	code   code.Coder
-	cache  cache.Cacher
-	hcache cache.HCacher
-	opts   []OptFn
+	code       code.Coder
+	cache      cache.Cacher
+	hcache     cache.HCacher
+	namespance string
+	opts       []OptFn
 }
 
-func NewCacheAside(code code.Coder, cache cache.Cacher, opts ...OptFn) *CacheAside {
+func NewCacheAside(code code.Coder, cache cache.Cacher, namespance string, opts ...OptFn) *CacheAside {
 	return &CacheAside{
-		code:  code,
-		cache: cache,
-		opts:  opts,
+		code:       code,
+		cache:      cache,
+		namespance: namespance,
+		opts:       opts,
 	}
 }
 
-func NewHCacheAside(code code.Coder, hcache cache.HCacher, opts ...OptFn) *CacheAside {
+func NewHCacheAside(code code.Coder, hcache cache.HCacher, namespance string, opts ...OptFn) *CacheAside {
 	return &CacheAside{
-		code:   code,
-		hcache: hcache,
-		opts:   opts,
+		code:       code,
+		hcache:     hcache,
+		namespance: namespance,
+		opts:       opts,
 	}
 }
 
@@ -62,6 +69,7 @@ func (ca *CacheAside) Fetch(fetchSource FetchSource, genCacheKey GenCacheKey, op
 			ca: &CacheAside{
 				code:  ca.code,
 				cache: ca.cache,
+                namespance: ca.namespance,
 			},
 			opt: opt,
 		},
@@ -83,6 +91,7 @@ func (ca *CacheAside) HFetch(fetchSource FetchSourceHash, genCacheHashField GenC
 			ca: &CacheAside{
 				code:   ca.code,
 				hcache: ca.hcache,
+                namespance: ca.namespance,
 			},
 			opt: opt,
 		},
@@ -103,9 +112,9 @@ const (
 )
 
 type Option struct {
-	ttl                   *time.Duration
-	log                   Logger
-	_strategy             *Strategy
+	ttl                 *time.Duration
+	log                 Logger
+	_strategy           *Strategy
 	_cacheGetErrHandler func(ctx context.Context, err error, keys, fields []string, extra ...interface{})
 	_cacheSetErrHandler func(ctx context.Context, err error, keys, fields []string, extra ...interface{}) error
 }
@@ -123,7 +132,7 @@ func (o *Option) cacheGetErrHandler() func(ctx context.Context, err error, keys,
 }
 
 func (o *Option) cacheSetErrHandler() func(ctx context.Context, err error, keys, fields []string,
-    extra ...interface{}) error {
+	extra ...interface{}) error {
 	if o._cacheGetErrHandler != nil {
 		return o._cacheSetErrHandler
 	}
@@ -146,17 +155,17 @@ func (o *Option) strategy() Strategy {
 type OptFn func(opt *Option)
 
 func WithcacheGetErrHandler(cacheGetErrHandler func(ctx context.Context, err error, keys, fields []string,
-    extra ...interface{})) OptFn {
+	extra ...interface{})) OptFn {
 	return func(opt *Option) {
 		opt._cacheGetErrHandler = cacheGetErrHandler
 	}
 }
 
 func WithcacheSetErrHandler(cacheSetErrHandler func(ctx context.Context, err error, keys, fields []string,
-    extra ...interface{}) error) OptFn {
-    return func(opt *Option) {
-        opt._cacheSetErrHandler = cacheSetErrHandler
-    }
+	extra ...interface{}) error) OptFn {
+	return func(opt *Option) {
+		opt._cacheSetErrHandler = cacheSetErrHandler
+	}
 }
 
 func WithStrategy(strategy Strategy) OptFn {
@@ -212,6 +221,12 @@ func (f *Fetcher) mget(ctx context.Context, keys []string, res interface{},
 		return false, err
 	}
 
+	var tmpKeys []string
+	for _, key := range keys {
+		tmpKeys = append(tmpKeys, fmt.Sprintf(keyFormat, f.ca.namespance, key))
+	}
+	keys = tmpKeys
+
 	resType, resVal, err := f.resRelVal(len(keys), res)
 	if err != nil {
 		return false, err
@@ -227,9 +242,13 @@ func (f *Fetcher) mget(ctx context.Context, keys []string, res interface{},
 			f.opt.cacheGetErrHandler()(ctx, err, keys, nil, extra...)
 		}
 	}
+	if f.opt.log != nil {
+		f.opt.log.Debugf(ctx, "cacheaside: mget hit %d", len(existM))
+	}
 	if f.opt.strategy() == StrategyOnlyUseCache {
 		return f.merge(keys, existM, nil, resType, resVal)
 	}
+
 	missKVs, missM, err := f.fetchSourceMiss(ctx, keys, existM, extra...)
 	if err != nil {
 		return false, err
@@ -237,7 +256,7 @@ func (f *Fetcher) mget(ctx context.Context, keys []string, res interface{},
 	err = f.ca.cache.MSet(ctx, f.opt.ttl, missKVs...)
 	if err != nil && f.opt.cacheSetErrHandler() != nil {
 		err = f.opt.cacheSetErrHandler()(ctx,
-            fmt.Errorf("cacheaside: cache.MSet error:%w", err), keys, nil, extra...)
+			fmt.Errorf("cacheaside: cache.MSet error:%w", err), keys, nil, extra...)
 		if err != nil {
 			return false, err
 		}
@@ -249,6 +268,11 @@ func (f *Fetcher) MDel(ctx context.Context, keys ...string) error {
 	if err := f.check(); err != nil {
 		return err
 	}
+	var tmpKeys []string
+	for _, key := range keys {
+		tmpKeys = append(tmpKeys, fmt.Sprintf(keyFormat, f.ca.namespance, key))
+	}
+	keys = tmpKeys
 	return f.ca.cache.MDel(ctx, keys...)
 }
 
@@ -272,7 +296,7 @@ func (hf *HFetcher) hmGet(ctx context.Context, key string, fields []string, res 
 	if err != nil {
 		return false, err
 	}
-
+	key = fmt.Sprintf(keyFormat, hf.ca.namespance, key)
 	existM, err := hf.ca.hcache.HMGet(ctx, key, fields...)
 	if err != nil {
 		err = fmt.Errorf("cacheaside: cache.HMGet error:%w", err)
@@ -282,6 +306,9 @@ func (hf *HFetcher) hmGet(ctx context.Context, key string, fields []string, res 
 		if hf.opt.cacheGetErrHandler() != nil {
 			hf.opt.cacheGetErrHandler()(ctx, err, []string{key}, fields, extra...)
 		}
+	}
+	if hf.opt.log != nil {
+		hf.opt.log.Debugf(ctx, "cacheaside: hmget hit %d", len(existM))
 	}
 	if hf.opt.strategy() == StrategyOnlyUseCache {
 		return hf.merge(fields, existM, nil, tmpResType, tmpResVal)
@@ -307,6 +334,7 @@ func (hf *HFetcher) HMDel(ctx context.Context, key string, fields ...string) err
 	if err := hf.check(); err != nil {
 		return err
 	}
+	key = fmt.Sprintf(keyFormat, hf.ca.namespance, key)
 	return hf.ca.hcache.HMDel(ctx, key, fields...)
 }
 
@@ -314,6 +342,7 @@ func (hf *HFetcher) HDel(ctx context.Context, key string) error {
 	if err := hf.check(); err != nil {
 		return err
 	}
+	key = fmt.Sprintf(keyFormat, hf.ca.namespance, key)
 	return hf.ca.hcache.HDel(ctx, key)
 }
 
@@ -330,7 +359,7 @@ func (f *Fetcher) fetchSourceMiss(ctx context.Context, keys []string,
 		return nil, nil, nil
 	}
 	sort.Strings(missKeys)
-	vals, err, _ := f.sfg.Do(fmt.Sprintf("[%s]", strings.Join(missKeys, ",")),
+	vals, err, _ := f.sfg.Do(fmt.Sprintf(keyFormat, f.ca.namespance, strings.Join(missKeys, ",")),
 		func() (interface{}, error) {
 			v, e := f.fetchSource(ctx, missKeys, extra...)
 			if e != nil {
@@ -347,7 +376,7 @@ func (f *Fetcher) fetchSourceMiss(ctx context.Context, keys []string,
 		if err != nil {
 			return nil, nil, fmt.Errorf("cacheaside: Fetcher.genCacheKey error:%w", err)
 		}
-		missM[key] = v
+		missM[fmt.Sprintf(keyFormat, f.ca.namespance, key)] = v
 	}
 
 	var missKVs []*cache.KV
